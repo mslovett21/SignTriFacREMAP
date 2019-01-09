@@ -1,0 +1,3 @@
+/data/hetio_CsC.txt,0,0
+0,/data/hetio_GiG.txt,0
+0,0,/data/hetio_DrD.txt
