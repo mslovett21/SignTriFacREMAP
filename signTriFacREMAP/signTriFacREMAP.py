@@ -23,7 +23,7 @@ from math import pow
 import sys
 import os
 import csv
-
+ 
 def getCurrD(F_i,P,F_j):
     
     FiP   = np.dot(F_i,P)
@@ -50,7 +50,10 @@ def oneSidedLowF(F_j, P,F_i, weight):
     return B
 
 def sigUppF(D_pos,D_neg,F_j,P_neg,P_pos,bal):
-
+    print("sigUppF")
+    print("D_pos,F_j")
+    print(D_pos.shape)
+    print(F_j.shape)
     DposF   = np.dot(D_pos,F_j)
     DposFtP = np.dot(DposF, P_pos.transpose())
     DnegF   = np.dot(D_neg,F_j)
@@ -143,44 +146,49 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
         
     curr_iter        = 0
 
+    print("Finished initialization of the low-rank matrices...")
+
     while( curr_iter < max_iter):
         
+        print(curr_iter)
         one_sided_offset = 0
         signed_offset    = 0
+        one_sided_inter  = []
+        signed_inter     = []
+        print("Current iteration %d:" % (curr_iter))
 
         for layer_num in range(num_layers):
             #update low-rank layer representation
             upper_sum       = 0
             lower_sum       = 0
+            print("Currently investigating relationships with a layer %d:" % (layer_num))
             one_sided_inter = np.where(G_matrix[layer_num] == 1)[0]
             signed_inter    = np.where(G_matrix[layer_num] == 2)[0]
-            if(len(one_sided_inter) != 0 | len(signed_inter)!= 0):
-
-                for i in range(len(one_sided_inter)):
-                    curr      = i + one_sided_offset
-                    upper_sum = oneSidedUppF(D_vec[curr], F_vec[one_sided_inter[i]], P_vec[curr])
-                    lower_sum = lower_sum + oneSidedLowF( F_vec[one_sided_inter[i]], P_vec[curr],F_vec[layer_num], weight_vec[curr])
-                for j in range(len(signed_inter)):
-                    curr      = j + signed_offset
-                    upper_sum = upper_sum + sigUppF(D_pos_vec[curr],D_neg_vec[curr],F_vec[signed_inter[j]],P_pos_vec[curr],P_neg_vec[curr], bal_vec[curr])
-                    lower_sum = lower_sum + signLowF(D_pos_vec[curr],D_neg_vec[curr],F_vec[signed_inter[j]],P_pos_vec[curr],P_neg_vec[curr], bal_vec[curr],F_vec[layer_num],weight_sign_vec[curr])
+            for i in range(len(one_sided_inter)):
+                curr      = i + one_sided_offset
+                upper_sum = oneSidedUppF(D_vec[curr], F_vec[one_sided_inter[i]], P_vec[curr])
+                lower_sum = lower_sum + oneSidedLowF( F_vec[one_sided_inter[i]], P_vec[curr],F_vec[layer_num], weight_vec[curr])
+            for j in range(len(signed_inter)):
+                curr = j + signed_offset
+                upper_sum = upper_sum + sigUppF(D_pos_vec[curr],D_neg_vec[curr],F_vec[signed_inter[j]],P_pos_vec[curr],P_neg_vec[curr], bal_vec[curr])
+                lower_sum = lower_sum + signLowF(D_pos_vec[curr],D_neg_vec[curr],F_vec[signed_inter[j]],P_pos_vec[curr],P_neg_vec[curr], bal_vec[curr],F_vec[layer_num],weight_sign_vec[curr])
                 
-                A = upper_sum + (alpha * np.dot(A_vec[layer_num],F_vec[layer_num]))
-                B = lower_sum + (alpha * np.dot(T_vec[layer_num].todense(),F_vec[layer_num])) + (beta * F_vec[layer_num]) 
-                F_vec[layer_num] = np.multiply(F_vec[layer_num],np.sqrt(np.divide(A,B)))
+            A = upper_sum + (alpha * np.dot(A_vec[layer_num],F_vec[layer_num]))
+            B = lower_sum + (alpha * np.dot(T_vec[layer_num].todense(),F_vec[layer_num])) + (beta * F_vec[layer_num]) 
+            F_vec[layer_num] = np.multiply(F_vec[layer_num],np.sqrt(np.divide(A,B)))
              
                 #update low-rank inter-layer relation matrices that involve that layer
-                for k in range(len(one_sided_inter)):
-                    curr            = k + one_sided_offset
-                    P_vec[curr]     = updateP(F_vec[layer_num], D_vec[curr],F_vec[one_sided_inter[k]], P_vec[curr], weight_vec[curr])
-                for l in range(len(signed_inter)):
-                    curr            = l + signed_offset
-                    P_pos_vec[curr] = updateP(F_vec[layer_num], D_pos_vec[curr],F_vec[signed_inter[l]], P_pos_vec[curr], weight_sign_vec[curr])
-                    P_neg_vec[curr] = updateP(F_vec[layer_num], D_neg_vec[curr],F_vec[signed_inter[l]], P_neg_vec[curr], weight_sign_vec[curr])
+            for k in range(len(one_sided_inter)):
+                curr            = k + one_sided_offset
+                P_vec[curr]     = updateP(F_vec[layer_num], D_vec[curr],F_vec[one_sided_inter[k]], P_vec[curr], weight_vec[curr])
+            for l in range(len(signed_inter)):
+                curr            = l + signed_offset
+                P_pos_vec[curr] = updateP(F_vec[layer_num], D_pos_vec[curr],F_vec[signed_inter[l]], P_pos_vec[curr], weight_sign_vec[curr])
+                P_neg_vec[curr] = updateP(F_vec[layer_num], D_neg_vec[curr],F_vec[signed_inter[l]], P_neg_vec[curr], weight_sign_vec[curr])
                 
-                one_sided_offset = one_sided_offset + len(one_sided_inter)
-                signed_offset    = signed_offset    + len(signed_inter)
-                curr_iter        = curr_iter + 1
+            one_sided_offset = one_sided_offset + len(one_sided_inter)
+            signed_offset    = signed_offset    + len(signed_inter)
+            curr_iter        = curr_iter + 1
    
     
     return (F_vec,P_vec, P_pos_vec, P_neg_vec)
@@ -231,6 +239,8 @@ if __name__== '__main__':
         for i in range(len(x)):
             abs_file_path = script_dir + str(D_matrix[x[i]][y[i]])
             D = np.loadtxt(open(abs_file_path,"rb"), delimiter=",")
+            print(str(D_matrix[x[i]][y[i]]))
+            print(D.shape)
             D_vec.append(D)
             curr_weight = W_matrix[x[i]][y[i]]
             weight_vec.append(curr_weight)
@@ -243,6 +253,9 @@ if __name__== '__main__':
             D     = np.array(list(csv.reader(open(abs_file_path), quoting=csv.QUOTE_NONNUMERIC)))
             D_pos = 0.5 * (np.abs(D) + D)
             D_neg = 0.5 * (np.abs(D) - D)
+            print(str(D_matrix[sign_x[j]][sign_y[j]]))
+            print(D_pos.shape)
+            print(D_neg.shape)
             D_pos_vec.append(D_pos)
             D_neg_vec.append(D_neg)
             curr_weight = W_matrix[sign_x[j]][sign_y[j]]
@@ -255,9 +268,11 @@ if __name__== '__main__':
         #Load all A matrices 
         A_vec = []       
         for k in range(num_layers):
-            abs_file_path = script_dir + str(A_matrix[k][k]) 
+            abs_file_path = script_dir + str(A_matrix[k][k])
+            print(A_matrix[k][k])
             A = np.array(list(csv.reader(open(abs_file_path), quoting=csv.QUOTE_NONNUMERIC)))
             A_vec.append(A)
+            print(A.shape)
 
         [F_vec,P_vec, P_pos_vec, P_neg_vec] = signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, weight_sign_vec, alpha, beta, b_vec, max_iter)
 
