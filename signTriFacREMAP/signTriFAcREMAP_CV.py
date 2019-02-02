@@ -25,6 +25,7 @@ import os
 import csv
 from sklearn.model_selection import KFold
 from sklearn import metrics
+import time
 
 
 
@@ -103,6 +104,8 @@ def mask_the_values(matrix_copy,chosen_mask,all_indices):
         matrix_copy[all_indices[chosen_mask[i]][0]][all_indices[chosen_mask[i]][1]] = 0.0
     return masked_values, matrix_copy
 
+
+
 def get_predicted_values(masked_values, predicted_matrix,chosen_mask,all_indices,matrix_copy):
     predicted_values = []
     for i in range(len(chosen_mask)):
@@ -139,7 +142,7 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
          #initialize low-rank representation for each of the layers
     F_vec     = []
     for i in range(num_layers):
-        F_vec.append(np.random.random((layers_size[i],layers_size[i])))
+        F_vec.append(np.random.rand(layers_size[i],layers_size[i]))
 
     #initialize T[i] is a diagonal matrix of A[i] 
     T_vec     = []
@@ -149,21 +152,22 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
     #initialize P_pos_vec that stores low-rank matrices that describe interactions between layers
     P_vec = []
     for i in range(num_pairs_one_inter):
-        P_vec.append(np.random.random((layers_size[x[i]],layers_size[y[i]])))
+        P_vec.append(np.random.rand(layers_size[x[i]],layers_size[y[i]]))
 
     #initialize P_pos_vec that stores low-rank matrices that describe interactions between layers
     P_pos_vec = []
     for j in range(num_pairs_sign_inter):
-        P_pos_vec.append(np.random.random((layers_size[sign_x[j]],layers_size[sign_y[j]])))
+        P_pos_vec.append(np.random.rand(layers_size[sign_x[j]],layers_size[sign_y[j]]))
     
     #initialize P_neg_vec that stores low-rank matrices that describe interactions between layers
     P_neg_vec = []
     for k in range(num_pairs_sign_inter):
-        P_neg_vec.append(np.random.random((layers_size[sign_x[k]],layers_size[sign_y[k]])))   
+        P_neg_vec.append(np.random.rand(layers_size[sign_x[k]],layers_size[sign_y[k]]))   
 
     curr_iter        = 0
-
+    start = time.time()
     while( curr_iter < max_iter):
+        print("Current iteration %d" % (curr_iter))
         
         one_sided_offset = 0
         signed_offset    = 0
@@ -203,6 +207,9 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
             signed_offset    = signed_offset    + len(signed_inter)
 
         curr_iter        = curr_iter + 1
+    end = time.time()
+    print("Time to complete the interations:")
+    print(end - start)
    
     
     return (F_vec,P_vec, P_pos_vec, P_neg_vec)
@@ -215,6 +222,8 @@ def signTriFacREMAP_CV(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec,
     print("Start the 10 fold CV for:weight_vec, weight_sign_vec, alpha, beta, bal_vec")
 
     filep = open("./results/resuits_d_vec0.txt", "w+")
+
+    check = open("check.txt", "w+")
 
     matrix_shape_x,matrix_shape_y =  D_vec[0].shape
 
@@ -231,10 +240,14 @@ def signTriFacREMAP_CV(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec,
     f1_vec        = []
     alpha_vec     = []
     beta_vec      = []
+    P_vec         = []
+    F_vec         = []
+    P_pos_vec     = []
+    P_neg_vec     = []
 
-    alphas_range  = np.arange(0.1,1.1,0.1)
-    betas_range   = np.arange(0.1,1.1,0.1)  
-    weights_range = np.arange(0.1,1.1,0.1)
+    alphas_range  = np.arange(0.1,1.1,0.2)
+    betas_range   = np.arange(0.1,1.1,0.2)  
+    weights_range = np.arange(0.1,1.1,0.2)
     
     original_matrix = D_vec[0].copy()
 
@@ -264,22 +277,27 @@ def signTriFacREMAP_CV(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec,
                             predicted_values, D_vec[0]        = get_predicted_values(masked_values, predicted_matrix,chosen_mask,all_indices,D_vec[0])
                             predicted_values                  = np.where(predicted_values >1.0, 1, predicted_values)
                             predicted_values                  = np.round(predicted_values)
+                            for w in range(len(chosen_mask)):
+                                check.write(str(chosen_mask[w]))
+                                check.write(" , ")
+                                check.write(str(predicted_values[w]))
+                                check.write("\n")
                             
                             precision_vec_10fold.append(metrics.precision_score(masked_values,predicted_values))
-                            #auc_vec_10fold.append(metrics.auc(masked_values,predicted_values))
+                            auc_vec_10fold.append(metrics.auc(masked_values,predicted_values))
                             recall_vec_10fold.append(metrics.recall_score(masked_values,predicted_values))
                             f1_vec_10fold.append(metrics.f1_score(masked_values,predicted_values))
 
                         #Average the performance metrics across 10 fold for the given set of hyperparameters 
                         precision_vec.append(np.array(precision_vec_10fold).mean())
-                        #auc_vec.append(np.array(auc_vec_10fold).mean())
+                        auc_vec.append(np.array(auc_vec_10fold).mean())
                         recall_vec.append(np.array(recall_vec_10fold).mean())
                         f1_vec.append(np.array(f1_vec_10fold).mean())
                         alpha_vec.append(alpha)
                         beta_vec.append(beta)
 
 
-                        filep.write("alpha: %.2f, beta: %.2f,w[0]: %.2f, sign_w[0]: %.2f, sign_w[1]: %.2f, precision: %.2f, auc: %.2f, recall: %.2f, f1: %.2f \n" % (alpha,beta, weight_vec[0], weight_sign_vec[0], weight_sign_vec[1],precision_vec[-1],3.0,recall_vec[-1],f1_vec[-1]))
+                        filep.write("alpha: %.2f, beta: %.2f,w[0]: %.2f, sign_w[0]: %.2f, sign_w[1]: %.2f, precision: %.2f, auc: %.2f, recall: %.2f, f1: %.2f \n" % (alpha,beta, weight_vec[0], weight_sign_vec[0], weight_sign_vec[1],precision_vec[-1],auc_vec[-1],recall_vec[-1],f1_vec[-1]))
                         filep.flush()
                         os.fsync(filep)
 
@@ -358,25 +376,7 @@ if __name__== '__main__':
             abs_file_path = script_dir + str(A_matrix[k][k])
             A = np.array(list(csv.reader(open(abs_file_path), quoting=csv.QUOTE_NONNUMERIC)))
             A_vec.append(A)
-            print(A.shape)
+
 
         [F_vec,P_vec, P_pos_vec, P_neg_vec] = signTriFacREMAP_CV(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, weight_sign_vec, b_vec, max_iter)
 
-        # Save each matrix in separate file
-        for i in range(len(F_vec)):
-            np.savetxt('F_results/REMAP_pred_F'+str(i)+'.csv',F_vec[i],delimiter=',')
-
-        num_layers       = len(A_vec)
-        one_sided_offset = 0
-        signed_offset    = 0
-        for layer_num in range(num_layers):
-            one_sided_inter = np.where(G_matrix[layer_num] == 1)[0]
-            signed_inter    = np.where(G_matrix[layer_num] == 2)[0]
-            if(len(one_sided_inter) != 0 | len(signed_inter)!= 0):
-                for i in range(len(one_sided_inter)):
-                    curr = i + one_sided_offset
-                    np.savetxt('P_results/REMAP_P_relation'+str(layer_num)+str(one_sided_inter[i]) + '.csv',P_vec[curr],delimiter=',')
-                for j in range(len(signed_inter)):
-                    curr      = j + signed_offset
-                    np.savetxt('P_results/REMAP_P_pos_relation.' + str(layer_num) + str(signed_inter[j]) + '.csv',P_pos_vec[curr],delimiter=',')
-                    np.savetxt('P_results/REMAP_P_neg_relation.' + str(layer_num) + str(signed_inter[j]) + '.csv',P_neg_vec[curr],delimiter=',')            
