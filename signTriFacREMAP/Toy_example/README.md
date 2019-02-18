@@ -11,7 +11,7 @@ python signTriFacREMAP.py conf_files/g_matrix.txt conf_files/d_matrices.txt conf
 
 ## Required configuration files formats:
 
-** g_matrix.txt **
+**g_matrix.txt**
 
 0,2,1,1,0
 0,0,1,2,2
@@ -19,7 +19,7 @@ python signTriFacREMAP.py conf_files/g_matrix.txt conf_files/d_matrices.txt conf
 0,0,0,0,0
 0,0,0,0,0
 
-** a_matrix.txt **
+**a_matrix.txt**
 
 /A_matrices/layer00.txt,0,0,0,0
 0,/A_matrices/layer11.txt,0,0,0
@@ -27,7 +27,7 @@ python signTriFacREMAP.py conf_files/g_matrix.txt conf_files/d_matrices.txt conf
 0,0,0,/A_matrices/layer33.txt,0
 0,0,0,0,/A_matrices/layer44.txt
 
-** d_matrices.txt **
+**d_matrices.txt**
 
 0,/D_matrices/relation01.txt,/D_matrices/relation02.txt,/D_matrices/relation03.txt,0
 0,0,/D_matrices/relation12.txt,/D_matrices/relation13.txt,/D_matrices/relation14.txt
@@ -35,7 +35,7 @@ python signTriFacREMAP.py conf_files/g_matrix.txt conf_files/d_matrices.txt conf
 0,0,0,0,0
 0,0,0,0,0
 
-** w_matrix.txt **
+**w_matrix.txt**
 
 0,0.23,0.5,0.78,0
 0,0,0.45,0.55,0.34
@@ -43,7 +43,7 @@ python signTriFacREMAP.py conf_files/g_matrix.txt conf_files/d_matrices.txt conf
 0,0,0,0,0
 0,0,0,0,0
 
-** b_matrix.txt **
+**b_matrix.txt**
 
 0,0.25,0,0,0
 0,0,0,0.32,0.78
