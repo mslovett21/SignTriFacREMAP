@@ -31,42 +31,65 @@ from scipy.sparse import rand
 
 
 def getCurrD(F_i,P,F_j):
+    print("FUNCTION: getCurrD")
+    start = time.time()
     FiP   = F_i.dot(P)
     currD = FiP.dot(F_j.transpose())
-    return sparse.csr_matrix(currD)
+    currD_sparse = sparse.csr_matrix(currD)
+    end = time.time()
+    print("Time spend in the getCurrD function:")
+    print(end-start)
+    return currD_sparse
 
 def oneSidedUppF(D, F_j, P):
+    print("FUNCTION: oneSidedUppF")
+    start = time.time()
     DF   = D.dot(F_j)
     DFtP = DF.dot(P.transpose())
-    print("oneSidedUppF returns shape")
-    print(DFtP.shape)
-    return sparse.csr_matrix(DFtP)
+    DFtP_sparse = sparse.csr_matrix(DFtP)
+    end = time.time()
+    print("Time spend in the oneSidedUppF function:")
+    print(end - start)
+    return DFtP_sparse
 
 def oneSidedLowF(F_j, P,F_i, weight):
+    print("FUNCTION: oneSidedLowF")
+    start     = time.time()
     w_sq      = pow(weight,2)
+    print("calling gerCurrD....")
     D_est     = getCurrD(F_i,P,F_j)   
     FjtP      = F_j.dot(P.transpose())
     FiP       = F_i.dot(P)
     tFj       = F_j.transpose()
-    B = (1-w_sq)* (D_est.dot(FjtP)) + w_sq*(FiP.dot(tFj).dot(FjtP))
-    print("one sided LowF returns shape")
-    print(B.shape)
-    return sparse.csr_matrix(B)
+    B         = (1-w_sq)* (D_est.dot(FjtP)) + w_sq*(FiP.dot(tFj).dot(FjtP))
+    B_sparse  = sparse.csr_matrix(B)
+    end       = time.time()
+    print("Time spend in the oneSidedLowF function:")
+    print(end-start)
+    return B_sparse
 
 def sigUppF(D_pos,D_neg,F_j,P_neg,P_pos,bal):
+    print("FUNCTION: sigUppF")
+    start   = time.time()
     DposF   = D_pos.dot(F_j)
     DposFtP = DposF.dot(P_pos.transpose())
     DnegF   = D_neg.dot(F_j)
     DnegFtP = DnegF.dot(P_neg.transpose())
     sig_sum =  (bal*DposFtP) + (1-bal)*DnegFtP
-    print("sigUppF shape")
-    print(sig_sum.shape)
-    return sparse.csr_matrix(sig_sum)
+    sig_sum_sparse = sparse.csr_matrix(sig_sum)
+    end     = time.time()
+    print("Time spend in sigUppF function:")
+    print(end - start)
+    return sig_sum_sparse
 
 def signLowF(D_pos,D_neg,F_j,P_pos,P_neg, bal,F_i,weight):
-   
+    print("FUNCTION: signLowF")
+    start1        = time.time()
+    start2        = time.time()
     w_sq          = pow(weight,2)
+    print("calling getCurrD....")
     D_pos_est     = getCurrD(F_i,P_pos,F_j)
+    print("calling getCurrD....")
     D_neg_est     = getCurrD(F_i,P_neg,F_j)
     tFj           = F_j.transpose()
     FjtP_pos      = F_j.dot(P_pos.transpose())
@@ -75,27 +98,39 @@ def signLowF(D_pos,D_neg,F_j,P_pos,P_neg, bal,F_i,weight):
     P_negtFj      = P_neg.dot(tFj)
     
     DFjtP_pos     = D_pos_est.dot(FjtP_pos)
-    DFjtP_neg     = D_neg_est.dot(FjtP_neg) 
+    DFjtP_neg     = D_neg_est.dot(FjtP_neg)
+    end2          = time.time()
+    print("Time spent in signLowF single operations")
+    print(end2-start2)
 
     positive      = bal*((1-w_sq)*(DFjtP_pos) + w_sq*(F_i.dot(P_postFj.dot(FjtP_pos))))
     negative      = (1-bal)*((1-w_sq)*(DFjtP_neg) + w_sq*(F_i.dot(P_negtFj.dot(FjtP_neg))))
     lower_sum     = positive + negative
-    print("signLowF shape")
-    print(lower_sum.shape)
-    return sparse.csr_matrix(lower_sum)
+    lower_sum_sp  = sparse.csr_matrix(lower_sum)
+    end1           = time.time()
+    print("Time spend in signLowF function:")
+    print(end1 - start1)
+    return lower_sum_sp
 
 def updateP(F_i, D,F_j, P, weight):
+    print("FUNCTION: updateP")
+    start  = time.time()
     tFi    = F_i.transpose() 
     A      = tFi.dot(D).dot(F_j)
+    print("calling getCurrD ....")
     D_est  = getCurrD(F_i,P,F_j)
     w_sq   = pow(weight,2)
     FiPtFj = F_i.dot(P).dot(F_j.transpose())
     midd   = (1- w_sq)*D_est + (w_sq*FiPtFj)
     B      = tFi.dot(midd).dot(F_j)
-    B = B.power(-1)
+    B      = B.power(-1)
     A_dividedby_B = A.multiply(B)
     newP   = P.multiply(A_dividedby_B.sqrt())
-    return sparse.csr_matrix(newP)
+    newP_sp = sparse.csr_matrix(newP)
+    end   = time.time()
+    print("Time spend in updateP function:")
+    print(end-start)
+    return newP_sp
 
 
 def get_predicted_values(masked_indexes, predicted_matrix):
@@ -111,7 +146,7 @@ def get_predicted_values(masked_indexes, predicted_matrix):
 
 
 def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, weight_sign_vec, bal_vec, max_iter,alpha,beta):
-
+    start = time.time()
     #number of layers in the network
     num_layers  = len(A_vec)    
     #initialize a vector that stores number of elems in each of the layers
@@ -156,7 +191,9 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
     P_neg_vec = []
     for k in range(num_pairs_sign_inter):
         P_neg_vec.append(rand(layers_size[sign_x[k]],layers_size[sign_y[k]], density = 1.0, format='csr'))   
-
+    end = time.time()
+    print("Time taken to initialize all of the needed matrices:")
+    print(end- start)
     curr_iter        = 0
     start = time.time()
     while( curr_iter < max_iter):
@@ -173,42 +210,24 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
             #update low-rank layer representation
             upper_sum       = rand(F_vec[layer_num].shape[0], F_vec[layer_num].shape[1], density=0.1, format="csr")
             lower_sum       = rand(F_vec[layer_num].shape[0], F_vec[layer_num].shape[1], density=0.1, format = "csr")
-            print("Initialize upper sum and lower sum")
-            print(upper_sum.shape)
-            print(lower_sum.shape)
 
             one_sided_inter = np.where(G_matrix[layer_num] == 1)[0]
             signed_inter    = np.where(G_matrix[layer_num] == 2)[0]
             for i in range(len(one_sided_inter)):
                 curr      = i + one_sided_offset
                 upper_sum = oneSidedUppF(D_vec[curr], F_vec[one_sided_inter[i]], P_vec[curr])
-                print("upper sum in the one sided inter")
-                print(upper_sum.shape)
                 lower_sum = lower_sum + oneSidedLowF( F_vec[one_sided_inter[i]], P_vec[curr],F_vec[layer_num], weight_vec[curr])
-                print("lower sum in the one sided inter")
-                print(lower_sum.shape)
             for j in range(len(signed_inter)):
                 curr = j + signed_offset
-                print("upper sum in the signed inter")
-                print(upper_sum.shape)
                 upper_sum = sparse.csr_matrix(upper_sum) + sigUppF(D_pos_vec[curr],D_neg_vec[curr],F_vec[signed_inter[j]],P_pos_vec[curr],P_neg_vec[curr], bal_vec[curr])
-                print("lower_sum in the signed inter")
-                print(lower_sum.shape)
                 lower_sum = sparse.csr_matrix(lower_sum) + signLowF(D_pos_vec[curr],D_neg_vec[curr],F_vec[signed_inter[j]],P_pos_vec[curr],P_neg_vec[curr], bal_vec[curr],F_vec[layer_num],weight_sign_vec[curr])
             A = upper_sum + (alpha * A_vec[layer_num].dot(F_vec[layer_num]))
             B = lower_sum + (alpha * T_vec[layer_num].dot(F_vec[layer_num]) + (beta * F_vec[layer_num]))
             B = B.power(-1)
-            print("A shape")
-            print(A.shape)
-            print("B shape")
-            print(B.shape)
-            print("A_ dividedby_B shape")
             A_dividedby_B = A.multiply(B)
-            print(A_dividedby_B.shape)
             F_vec[layer_num] = F_vec[layer_num].multiply(A_dividedby_B.sqrt())
-            print("F_vec[layer_num")
-            print(F_vec[layer_num].shape)
-                #update low-rank inter-layer relation matrices that involve that layer
+
+            #update low-rank inter-layer relation matrices that involve that layer
             for k in range(len(one_sided_inter)):
                 curr            = k + one_sided_offset
                 P_vec[curr]     = updateP(F_vec[layer_num], D_vec[curr],F_vec[one_sided_inter[k]], P_vec[curr], weight_vec[curr])
@@ -226,9 +245,7 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
     end = time.time()
     print("Time to complete the interations:")
     print(end - start)
-    print("Exiting the function")
-   
-    
+
     return (F_vec,P_vec, P_pos_vec, P_neg_vec)
 
 
@@ -237,8 +254,6 @@ def signTriFacREMAP_CV(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec,
 
 
     print("Start the 10 fold CV for:weight_vec, weight_sign_vec, alpha, beta, bal_vec")
-
-    filep = open("data/results/results_d_vec0.txt", "w+")
 
     check = open("data/check.txt", "w+")
 
@@ -270,6 +285,7 @@ def signTriFacREMAP_CV(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec,
                         # indexes should be stored in the list of lists
                         for k in range(1,11):
                             D_vec.append(sparse.load_npz("data/ten_fold/matrix_fold_" + str(k) + ".npz"))
+                            print("FOLD: %d" % ( k))
                             F_vec,P_vec, P_pos_vec, P_neg_vec = signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, weight_sign_vec, b_vec, max_iter,alpha,beta)
                             predicted_matrix                  = np.dot(np.dot(F_vec[0],P_vec[0]), F_vec[2].transpose())
                             masked_indexes = []
@@ -289,12 +305,6 @@ def signTriFacREMAP_CV(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec,
                                 pred_val_file.write("\n")
                             pred_val_file.close()
                             D_vec[:] = []
-                            
-
-
-                        filep.write("alpha: %.2f, beta: %.2f,w[0]: %.2f, sign_w[0]: %.2f, sign_w[1]: %.2f, precision: %.2f, auc: %.2f, recall: %.2f, f1: %.2f \n" % (alpha,beta, weight_vec[0], weight_sign_vec[0], weight_sign_vec[1],precision_vec[-1],auc_vec[-1],recall_vec[-1],f1_vec[-1]))
-                        filep.flush()
-                        os.fsync(filep)
 
 
 
@@ -307,11 +317,11 @@ def signTriFacREMAP_CV(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec,
 
 if __name__== '__main__':
 
-    print("This is 10-fold Cross-Validation for: w_weight, alpha, beta and w_matrix")
-    
-    print('Number of arguments:', len(sys.argv), 'arguments.')
+    print("This is 10-fold Cross-Validation for: alpha, beta and w_matrix")
+    start = time.time()
+    print('Number of provided argumenents %d' %  (len(sys.argv)-1))
     if(len(sys.argv) < 5):
-        print("Expected arguments: g_matrix.txt d_matrix.txt a_matrix.txt max_iteration w_matrix ")
+        print("Expected arguments: g_matrix.txt d_matrix.txt a_matrix.txt max_iteration ")
     else:
         G_matrix_fh = sys.argv[1]
         G_matrix    = np.loadtxt(open(G_matrix_fh, "rb"), delimiter=",")
@@ -320,8 +330,6 @@ if __name__== '__main__':
         A_matrix_fh = sys.argv[3]
         A_matrix    = np.loadtxt(open(A_matrix_fh, "rb"),dtype='str', delimiter=",")       
         max_iter    = int(sys.argv[4])
-        W_matrix_fh = sys.argv[5]
-        W_matrix    = np.loadtxt(open(W_matrix_fh, "rb"), delimiter=",")
         b_param_flag = False
 
 
@@ -340,14 +348,11 @@ if __name__== '__main__':
 
         #Load all D matrices describing one-sided relations into D_vec
         D_vec=[]
-        print("print len of x")
-        print(len(x))
         for i in range(len(x)):
             abs_file_path = script_dir + str(D_matrix[x[i]][y[i]])
             D = np.loadtxt(open(abs_file_path,"rb"), delimiter=",")
             D_vec.append(sparse.csr_matrix(D))
-            curr_weight = W_matrix[x[i]][y[i]]
-            weight_vec.append(curr_weight)
+            weight_vec.append(1.0)
 
         #Load all D matrices describing signed relations into D_pos_vec and D_neg_vec
         D_pos_vec = []
@@ -359,8 +364,7 @@ if __name__== '__main__':
             D_neg = 0.5 * (np.abs(D) - D)
             D_pos_vec.append(sparse.csr_matrix(D_pos))
             D_neg_vec.append(sparse.csr_matrix(D_neg))
-            curr_weight = W_matrix[sign_x[j]][sign_y[j]]
-            weight_sign_vec.append(curr_weight)
+            weight_sign_vec.append(1.0)
 
             if(b_param_flag):
                 b_vec.append(B_matrix[sign_x[j]][sign_y[j]])
@@ -373,8 +377,9 @@ if __name__== '__main__':
             abs_file_path = script_dir + str(A_matrix[k][k])
             A = np.array(list(csv.reader(open(abs_file_path), quoting=csv.QUOTE_NONNUMERIC)))
             A_vec.append(sparse.csr_matrix(A))
-
-
+        end = time.time()
+        print("Time to read in the data and change it to sparse matrices")
+        print(end-start)
         [F_vec,P_vec, P_pos_vec, P_neg_vec] = signTriFacREMAP_CV(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, weight_sign_vec, b_vec, max_iter)
 
 
