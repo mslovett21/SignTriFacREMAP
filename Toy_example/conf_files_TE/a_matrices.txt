@@ -1,0 +1,5 @@
+/A_matrices/layer00.txt,0,0,0,0
+0,/A_matrices/layer11.txt,0,0,0
+0,0,/A_matrices/layer22.txt,0,0
+0,0,0,/A_matrices/layer33.txt,0
+0,0,0,0,/A_matrices/layer44.txt

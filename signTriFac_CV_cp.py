@@ -29,18 +29,6 @@ import time
 from scipy.sparse import rand
 
 
-
-def getCurrD(F_i,P,F_j):
-    print("FUNCTION: getCurrD")
-    start = time.time()
-    FiP   = F_i.dot(P)
-    currD = FiP.dot(F_j.transpose())
-    currD_sparse = sparse.csr_matrix(currD)
-    end = time.time()
-    print("Time spend in the getCurrD function:")
-    print(end-start)
-    return currD_sparse
-
 def oneSidedUppF(D, F_j, P):
     print("FUNCTION: oneSidedUppF")
     start = time.time()
@@ -72,7 +60,7 @@ def sigUppF(D_pos,D_neg,FjtP_pos,FjtP_neg,bal):
     print("FUNCTION: sigUppF")
     start   = time.time()
     DposFtP = D_pos.dot(FjtP_pos)
-    DnegF   = D_neg.dot(FjtP_neg)
+    DnegFt  = D_neg.dot(FjtP_neg)
     sig_sum =  (bal*DposFtP) + (1-bal)*DnegFtP
     sig_sum_sparse = sparse.csr_matrix(sig_sum)
     end     = time.time()
@@ -125,7 +113,7 @@ def signLowF(D_pos,D_neg,F_j,P_pos,P_neg,FjtP_pos, FjtP_neg, bal,F_i,weight):
     negative      = (1-bal)*((1-w_sq)*(DFjtP_neg) + w_sq*(FiP_negtFj.dot(FjtP_neg)))
     lower_sum     = positive + negative
     lower_sum_sp  = sparse.csr_matrix(lower_sum)
-    end1           = time.time()
+    end1          = time.time()
     print("Time spend in signLowF function:")
     print(end1 - start1)
     return lower_sum_sp
@@ -135,17 +123,16 @@ def updateP(F_i, D,F_j, P, weight):
     start  = time.time()
     tFi    = F_i.transpose() 
     A      = tFi.dot(D).dot(F_j)
-    print("calling getCurrD ....")
-    D_est  = getCurrD(F_i,P,F_j)
     w_sq   = pow(weight,2)
     FiPtFj = F_i.dot(P).dot(F_j.transpose())
+    D_est  = FiPtFj
     midd   = (1- w_sq)*D_est + (w_sq*FiPtFj)
     B      = tFi.dot(midd).dot(F_j)
     B      = B.power(-1)
     A_dividedby_B = A.multiply(B)
-    newP   = P.multiply(A_dividedby_B.sqrt())
+    newP    = P.multiply(A_dividedby_B.sqrt())
     newP_sp = sparse.csr_matrix(newP)
-    end   = time.time()
+    end     = time.time()
     print("Time spend in updateP function:")
     print(end-start)
     return newP_sp
@@ -221,7 +208,6 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
         signed_offset    = 0
         one_sided_inter  = []
         signed_inter     = []
-        F_updates        = []
 
         for layer_num in range(num_layers):
             print("Layer %d " %(layer_num))
@@ -263,7 +249,7 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
             B = lower_sum + (alpha * T_vec[layer_num].dot(F_vec[layer_num]) + (beta * F_vec[layer_num]))
             B = B.power(-1)
             A_dividedby_B = A.multiply(B)
-            F_updates.append(F_vec[layer_num].multiply(A_dividedby_B.sqrt()))
+            F_vec[layer_num] = F_vec[layer_num].multiply(A_dividedby_B.sqrt())
 
             #update low-rank inter-layer relation matrices that involve that layer
             for k in range(len(one_sided_inter)):
