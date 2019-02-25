@@ -28,61 +28,77 @@ from sklearn import metrics
 import time
 from scipy.sparse import rand
 
+def D_estimation(D_est, D):
+    print("FUNCTION: D_estimate")
+    start         = time.time()
+    #observed relations in D
+    observed_ind  = list(np.transpose(D.nonzero()))
+    #predicted relations in D_est
+    pred_ind      = list(np.transpose(D_est.nonzero()))
+    #predicted values in D_est
+    pred_data     = D_est.data
+    #collect common indexes
+    indexes       = []
+    for i in observed_ind:
+        k = 0
+        for j in pred_ind:
+            if all(i == j):
+                indexes.append(k)
+            k = k+1
+    pred_data_obs = [pred_data[i] for i in indexes]
+    pred_comm_ind = [pred_ind[i]  for i in indexes]
+    row,col       = np.transpose(pred_comm_ind)
+    end           = time.time()
+    print("Time spent in D_estimate")
+    print(end-start)
 
+    return row,col, pred_data_obs
+
+
+
+    return x,y,data
 def oneSidedUppF(D, F_j, P):
     print("FUNCTION: oneSidedUppF")
-    start = time.time()
-    DF   = D.dot(F_j)
-    DFtP = DF.dot(P.transpose())
-    DFtP_sparse = sparse.csr_matrix(DFtP)
-    end = time.time()
+    start         = time.time()
+    DF            = D.dot(F_j)
+    DFtP          = DF.dot(P.transpose())
+    DFtP_sparse   = sparse.csr_matrix(DFtP)
+    end           = time.time()
     print("Time spend in the oneSidedUppF function:")
     print(end - start)
     return DFtP_sparse
 
-def oneSidedLowF(F_j, P,F_i,FjtP, weight):
+def oneSidedLowF(F_j, P,F_i,FjtP, weight,D):
     print("FUNCTION: oneSidedLowF")
-    start     = time.time()
-    w_sq      = pow(weight,2)
-    tFj       = F_j.transpose()
-    FiP       = F_i.dot(P)
-    FiPtFj    = FiP.dot(tFj)
+    start         = time.time()
+    w_sq          = pow(weight,2)
+    tFj           = F_j.transpose()
+    FiP           = F_i.dot(P)
+    FiPtFj        = FiP.dot(tFj)
+    row,col,data  = D_estimation(FiPtFj,D)
     #needs to be updated to zero out all unobserved entries
-    D_tilde   = FiPtFj
-    B         = (1-w_sq)* (D_tilde.dot(FjtP)) + w_sq*(FiPtFj.dot(FjtP))
-    B_sparse  = sparse.csr_matrix(B)
-    end       = time.time()
+    D_tilde       = sparse.csc_matrix((data,(row,col)),shape = D.shape)
+    B             = (1-w_sq)* (D_tilde.dot(FjtP)) + w_sq*(FiPtFj.dot(FjtP))
+    B_sparse      = sparse.csr_matrix(B)
+    end           = time.time()
     print("Time spend in the oneSidedLowF function:")
     print(end-start)
     return B_sparse
 
 def sigUppF(D_pos,D_neg,FjtP_pos,FjtP_neg,bal):
     print("FUNCTION: sigUppF")
-    start   = time.time()
-    DposFtP = D_pos.dot(FjtP_pos)
-    DnegFtP   = D_neg.dot(FjtP_neg)
-    sig_sum =  (bal*DposFtP) + (1-bal)*DnegFtP
-    sig_sum_sparse = sparse.csr_matrix(sig_sum)
-    end     = time.time()
+    start         = time.time()
+    DposFtP       = D_pos.dot(FjtP_pos)
+    DnegFtP       = D_neg.dot(FjtP_neg)
+    sig_sum       = (bal*DposFtP) + (1-bal)*DnegFtP
+    sig_sum_sparse= sparse.csr_matrix(sig_sum)
+    end           = time.time()
     print("Time spend in sigUppF function:")
     print(end - start)
     return sig_sum_sparse
 
 def signLowF(D_pos,D_neg,F_j,P_pos,P_neg,FjtP_pos, FjtP_neg, bal,F_i,weight):
     print("FUNCTION: signLowF")
-    print("F_j shape")
-    print(F_j.shape)
-    print("P_pos shape")
-    print(P_pos.shape)
-    print("P_neg shape")
-    print(P_neg.shape)
-    print("D_pos shape")
-    print(D_pos.shape)
-    print("D_neg shape")
-    print(D_neg.shape)
-    print("F_i shape")
-    print(F_i.shape)
-
     start1        = time.time()
     start2        = time.time()
     w_sq          = pow(weight,2)
@@ -92,17 +108,16 @@ def signLowF(D_pos,D_neg,F_j,P_pos,P_neg,FjtP_pos, FjtP_neg, bal,F_i,weight):
     P_postFj      = P_pos.dot(tFj)
     print("calculating P_negtFj....")
     P_negtFj      = P_neg.dot(tFj)
-
     print("calculating FiP_postFj...")
     FiP_postFj    = F_i.dot(P_postFj)
     print("calculating D_pos_tilde")
-    D_pos_tilde   = sparse.csr_matrix(FiP_postFj)
-
+    row,col,datap = D_estimation(FiP_postFj,D_pos)
+    D_pos_tilde   = sparse.csr_matrix((datap,(row,col)),shape = D_pos.shape)
     print("calculating FiP_negFj")
-    FiP_negtFj     = F_i.dot(P_negtFj)
+    FiP_negtFj    = F_i.dot(P_negtFj)
+    row,col,datan = D_estimation(FiP_negtFj,D_neg)
     print("calculating D_neg_tilde")
-    D_neg_tilde   = sparse.csr_matrix(FiP_negtFj)
-
+    D_neg_tilde   = sparse.csr_matrix((datan,(row,col)),shape = D_neg.shape)
     DFjtP_pos     = D_pos_tilde.dot(FjtP_pos)
     DFjtP_neg     = D_neg_tilde.dot(FjtP_neg)
     end2          = time.time()
@@ -120,19 +135,20 @@ def signLowF(D_pos,D_neg,F_j,P_pos,P_neg,FjtP_pos, FjtP_neg, bal,F_i,weight):
 
 def updateP(F_i, D,F_j, P, weight):
     print("FUNCTION: updateP")
-    start  = time.time()
-    tFi    = F_i.transpose() 
-    A      = tFi.dot(D).dot(F_j)
-    w_sq   = pow(weight,2)
-    FiPtFj = F_i.dot(P).dot(F_j.transpose())
-    D_est  = FiPtFj
-    midd   = (1- w_sq)*D_est + (w_sq*FiPtFj)
-    B      = tFi.dot(midd).dot(F_j)
-    B      = B.power(-1)
+    start         = time.time()
+    tFi           = F_i.transpose() 
+    A             = tFi.dot(D).dot(F_j)
+    w_sq          = pow(weight,2)
+    FiPtFj        = F_i.dot(P).dot(F_j.transpose())
+    row,col,data  = D_estimate(FiPtFj,D)
+    D_tilde       = sparse.csr_matrix((data, (row,col)), shape = D.shape)
+    midd          = (1- w_sq)*D_tilde + (w_sq*FiPtFj)
+    B             = tFi.dot(midd).dot(F_j)
+    B             = B.power(-1)
     A_dividedby_B = A.multiply(B)
-    newP    = P.multiply(A_dividedby_B.sqrt())
-    newP_sp = sparse.csr_matrix(newP)
-    end     = time.time()
+    newP          = P.multiply(A_dividedby_B.sqrt())
+    newP_sp       = sparse.csr_matrix(newP)
+    end           = time.time()
     print("Time spend in updateP function:")
     print(end-start)
     return newP_sp
@@ -229,7 +245,7 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
                 endU      = time.time()
                 print("Time spent in the oneSidedUppF :")
                 print(endU-startU)
-                lower_sum = lower_sum + oneSidedLowF( F_vec[one_sided_inter[i]], P_vec[curr],F_vec[layer_num],FjtP, weight_vec[curr])
+                lower_sum = lower_sum + oneSidedLowF( F_vec[one_sided_inter[i]], P_vec[curr],F_vec[layer_num],FjtP, weight_vec[curr], D_vec[curr])
             for j in range(len(signed_inter)):
                 curr      = j + signed_offset
                 print("CALCULATION: sigUppF prep")
