@@ -33,40 +33,21 @@ def D_estimation(D_est, D):
     start         = time.time()
     #observed relations in D
     observed_ind  = list(np.transpose(D.nonzero()))
-    #predicted relations in D_est
-    pred_ind      = list(np.transpose(D_est.nonzero()))
     #predicted values in D_est
-    pred_data     = D_est.data
+    pred_data     = []
     #collect common indexes
-    indexes       = []
-    for i in observed_ind:
-        k = 0
-        for j in pred_ind:
-            if all(i == j):
-                indexes.append(k)
-            k = k+1
-    pred_data_obs = [pred_data[i] for i in indexes]
-    pred_comm_ind = [pred_ind[i]  for i in indexes]
-    row,col       = np.transpose(pred_comm_ind)
+    for j in observed_ind:
+        pred_data.append(D_est[j[0],j[1]])
+    row,col       = D.nonzero()
     end           = time.time()
     print("Time spent in D_estimate")
     print(end-start)
 
-    return row,col, pred_data_obs
+    return row,col, pred_data
 
 
 
     return x,y,data
-def oneSidedUppF(D, F_j, P):
-    print("FUNCTION: oneSidedUppF")
-    start         = time.time()
-    DF            = D.dot(F_j)
-    DFtP          = DF.dot(P.transpose())
-    DFtP_sparse   = sparse.csr_matrix(DFtP)
-    end           = time.time()
-    print("Time spend in the oneSidedUppF function:")
-    print(end - start)
-    return DFtP_sparse
 
 def oneSidedLowF(F_j, P,F_i,FjtP, weight,D):
     print("FUNCTION: oneSidedLowF")
@@ -140,7 +121,7 @@ def updateP(F_i, D,F_j, P, weight):
     A             = tFi.dot(D).dot(F_j)
     w_sq          = pow(weight,2)
     FiPtFj        = F_i.dot(P).dot(F_j.transpose())
-    row,col,data  = D_estimate(FiPtFj,D)
+    row,col,data  = D_estimation(FiPtFj,D)
     D_tilde       = sparse.csr_matrix((data, (row,col)), shape = D.shape)
     midd          = (1- w_sq)*D_tilde + (w_sq*FiPtFj)
     B             = tFi.dot(midd).dot(F_j)
