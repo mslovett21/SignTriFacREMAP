@@ -86,6 +86,10 @@ def signLowF(D_pos,D_neg,F_j,P_pos,P_neg,FjtP_pos, FjtP_neg, bal,F_i,weight):
     print("calculating tFj....")
     tFj           = F_j.transpose()
     print("calculating P_postFj....")
+    print("Shape of P_pos")
+    print(P_pos.shape)
+    print("Shape of tFj")
+    print(tFj.shape)
     P_postFj      = P_pos.dot(tFj)
     print("calculating P_negtFj....")
     P_negtFj      = P_neg.dot(tFj)
@@ -196,15 +200,30 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
     end = time.time()
     print("Time taken to initialize all of the needed matrices:")
     print(end- start)
-    curr_iter        = 0
-    start = time.time()
+    for i in range(len(P_pos_vec)):
+        print("P_pos_vec")
+        print(P_pos_vec[i].shape)
+    for i in range(len(P_vec)):
+        print("P_vec")
+        print(P_vec[i].shape)
+    curr_iter           = 0
+    start               = time.time()
+    G_size              = G_matrix.shape[0]
+    ind                 = np.tril_indices(G_size,-1)
+    G_matrix[ind]       = G_matrix.T[ind]
+
+
     while( curr_iter < max_iter):
         print("Current iteration %d" % (curr_iter))
         
-        one_sided_offset = 0
-        signed_offset    = 0
-        one_sided_inter  = []
-        signed_inter     = []
+        one_sided_offset   = 0
+        signed_offset      = 0
+        
+        l_one_sided_offset = 0
+        l_signed_offset    = 0
+
+        one_sided_inter    = []
+        signed_inter       = []
 
         for layer_num in range(num_layers):
             print("Layer %d " %(layer_num))
@@ -215,33 +234,76 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
 
             one_sided_inter = np.where(G_matrix[layer_num] == 1)[0]
             signed_inter    = np.where(G_matrix[layer_num] == 2)[0]
+            print("one_sided_inter")
+            print(one_sided_inter)
+            print("signed_inter")
+            print(signed_inter)
 
             for i in range(len(one_sided_inter)):
                 print("CALCULATION: oneSidedUppF")
                 startU    = time.time()
-                curr      = i + one_sided_offset
-                tP        = P_vec[curr].transpose()
+                curr      = 0
+                if (layer_num > one_sided_inter[i]):
+                    curr               = l_one_sided_offset
+                    l_one_sided_offset = l_one_sided_offset + 1
+                else:
+                    curr               =  one_sided_offset
+                    one_sided_offset   = one_sided_offset +1
+                P         = P_vec[curr]
+                D         = D_vec[curr]
+                if (layer_num > one_sided_inter[i]):
+                    P     = P.transpose()
+                    D     = D.transpose()
+                tP        = P.transpose()
                 FjtP      = F_vec[one_sided_inter[i]].dot(tP)
-                upper_sum = upper_sum + D_vec[curr].dot(FjtP)
+                upper_sum = upper_sum + D.dot(FjtP)
                 endU      = time.time()
+                
+                
                 print("Time spent in the oneSidedUppF :")
                 print(endU-startU)
-                lower_sum = lower_sum + oneSidedLowF( F_vec[one_sided_inter[i]], P_vec[curr],F_vec[layer_num],FjtP, weight_vec[curr], D_vec[curr])
+
+                lower_sum = lower_sum + oneSidedLowF( F_vec[one_sided_inter[i]], P,F_vec[layer_num],FjtP, weight_vec[curr], D)
             for j in range(len(signed_inter)):
-                curr      = j + signed_offset
+                curr      = 0
                 print("CALCULATION: sigUppF prep")
                 startU2   = time.time()
-                tP_pos    = P_pos_vec[curr].transpose()
-                tP_neg    = P_neg_vec[curr].transpose()
+                if(layer_num > signed_inter[j]):
+                    curr  = l_signed_offset
+                    l_signed_offset = l_signed_offset + 1
+                else:
+                    curr  = signed_offset
+                    signed_offset = signed_offset + 1
+                P_pos     = P_pos_vec[curr]
+                P_neg     = P_neg_vec[curr]
+                D_pos     = D_pos_vec[curr]
+                D_neg     = D_neg_vec[curr]
+                if(layer_num < signed_inter[j]):
+                    tP_pos    = P_pos.transpose()
+                    tP_neg    = P_neg.transpose()
+                else:
+                    tP_pos    = P_pos
+                    tP_neg    = P_neg
+                    D_pos     = D_pos.transpose()
+                    D_neg     = D_neg.transpose()
+                    P_pos     = P_pos.transpose()
+                    P_neg     = P_neg.transpose()
+                print("Shapes P_pos")
+                print(P_pos.shape)
+                print("Shape Fj")
+                print(F_vec[signed_inter[j]].shape)
+                print("Shape D")
+                print(D_pos.shape)
+
                 FjtP_pos  = F_vec[signed_inter[j]].dot(tP_pos)
                 FjtP_neg  = F_vec[signed_inter[j]].dot(tP_neg)
                 endU2     = time.time()
                 print("Time spent in the sigUpp pred")
                 print(endU2 - startU2)
 
-                upper_sum = sparse.csr_matrix(upper_sum) + sigUppF(D_pos_vec[curr],D_neg_vec[curr],FjtP_pos,FjtP_neg, bal_vec[curr])
+                upper_sum = sparse.csr_matrix(upper_sum) + sigUppF(D_pos,D_neg,FjtP_pos,FjtP_neg, bal_vec[curr])
 
-                lower_sum = sparse.csr_matrix(lower_sum) + signLowF(D_pos_vec[curr],D_neg_vec[curr],F_vec[signed_inter[j]],P_pos_vec[curr],P_neg_vec[curr],FjtP_pos,FjtP_neg, bal_vec[curr],F_vec[layer_num],weight_sign_vec[curr])
+                lower_sum = sparse.csr_matrix(lower_sum) + signLowF(D_pos,D_neg,F_vec[signed_inter[j]],P_pos,P_neg,FjtP_pos,FjtP_neg, bal_vec[curr],F_vec[layer_num],weight_sign_vec[curr])
             A = upper_sum + (alpha * A_vec[layer_num].dot(F_vec[layer_num]))
             B = lower_sum + (alpha * T_vec[layer_num].dot(F_vec[layer_num]) + (beta * F_vec[layer_num]))
             B = B.power(-1)
@@ -249,16 +311,22 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
             F_vec[layer_num] = F_vec[layer_num].multiply(A_dividedby_B.sqrt())
 
             #update low-rank inter-layer relation matrices that involve that layer
-            for k in range(len(one_sided_inter)):
-                curr            = k + one_sided_offset
-                P_vec[curr]     = updateP(F_vec[layer_num], D_vec[curr],F_vec[one_sided_inter[k]], P_vec[curr], weight_vec[curr])
-            for l in range(len(signed_inter)):
-                curr            = l + signed_offset
-                P_pos_vec[curr] = updateP(F_vec[layer_num], D_pos_vec[curr],F_vec[signed_inter[l]], P_pos_vec[curr], weight_sign_vec[curr])
-                P_neg_vec[curr] = updateP(F_vec[layer_num], D_neg_vec[curr],F_vec[signed_inter[l]], P_neg_vec[curr], weight_sign_vec[curr])
-            print("Done with the updates")
-            one_sided_offset = one_sided_offset + len(one_sided_inter)
-            signed_offset    = signed_offset    + len(signed_inter)
+#            for k in range(len(one_sided_inter)):
+#                if (layer_num > signed_inter[j]):
+#                    pass
+#                else:
+#                    #urr            = k + one_sided_offset
+#                    #_vec[curr]     = updateP(F_vec[layer_num], D_vec[curr],F_vec[one_sided_inter[k]], P_vec[curr], weight_vec[curr])
+#            for l in range(len(signed_inter)):
+#                if (layer_num > signed_inter[j]):
+#                    pass
+#                else:
+#                    #urr            = l + signed_offset
+#                   #P_pos_vec[curr] = updateP(F_vec[layer_num], D_pos_vec[curr],F_vec[signed_inter[l]], P_pos_vec[curr], weight_sign_vec[curr])
+#                   #P_neg_vec[curr] = updateP(F_vec[layer_num], D_neg_vec[curr],F_vec[signed_inter[l]], P_neg_vec[curr], weight_sign_vec[curr])
+#            print("Done with the updates")
+
+    
 
         curr_iter        = curr_iter + 1
 
