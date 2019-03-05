@@ -216,26 +216,19 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
     while( curr_iter < max_iter):
         print("Current iteration %d" % (curr_iter))
         
-        one_sided_offset      = 0
-        signed_offset         = 0
+        one_sided_offset   = 0
+        signed_offset      = 0
         
-        l_one_sided_offset    = 0
-        l_signed_offset       = 0
+        l_one_sided_offset = 0
+        l_signed_offset    = 0
 
-        glo_one_sided_offset  = 0
-        glo_signed_offset     = 0
-
-        glo_lone_sided_offset = 0
-        glo_lsigned_offset    = 0
-
-
-        one_sided_inter       = []
-        signed_inter          = []
+        one_sided_inter    = []
+        signed_inter       = []
 
         for layer_num in range(num_layers):
             print("Layer %d " %(layer_num))
 
-            #initialize matrix of shape of a layer that is currently being updated
+            #update low-rank layer representation
             upper_sum       = rand(F_vec[layer_num].shape[0], F_vec[layer_num].shape[1], density=0.1, format = "csr")
             lower_sum       = rand(F_vec[layer_num].shape[0], F_vec[layer_num].shape[1], density=0.1, format = "csr")
 
@@ -248,17 +241,14 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
 
             for i in range(len(one_sided_inter)):
                 print("CALCULATION: oneSidedUppF")
-                
                 startU    = time.time()
                 curr      = 0
                 if (layer_num > one_sided_inter[i]):
-                    curr                   =  glo_lone_sided_offset
-                    glo_lone_sided_offset  =  glo_lone_sided_offset + 1
-                    l_one_sided_offset     =  l_one_sided_offset + 1
+                    curr               = l_one_sided_offset
+                    l_one_sided_offset = l_one_sided_offset + 1
                 else:
-                    curr                   = glo_one_sided_offset
-                    glo_one_sided_offset   = glo_one_sided_offset + 1
-                    one_sided_offset       = one_sided_offset + 1
+                    curr               =  one_sided_offset
+                    one_sided_offset   = one_sided_offset +1
                 P         = P_vec[curr]
                 D         = D_vec[curr]
                 if (layer_num > one_sided_inter[i]):
@@ -279,13 +269,11 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
                 print("CALCULATION: sigUppF prep")
                 startU2   = time.time()
                 if(layer_num > signed_inter[j]):
-                    curr               = glo_lsigned_offset
-                    glo_lsigned_offset = glo_lsigned_offset + 1
-                    l_signed_offset    = l_signed_offset + 1
+                    curr  = l_signed_offset
+                    l_signed_offset = l_signed_offset + 1
                 else:
-                    curr              = glo_signed_offset
-                    glo_signed_offset = glo_signed_offset + 1
-                    signed_offset     = signed_offset + 1
+                    curr  = signed_offset
+                    signed_offset = signed_offset + 1
                 P_pos     = P_pos_vec[curr]
                 P_neg     = P_neg_vec[curr]
                 D_pos     = D_pos_vec[curr]
@@ -321,53 +309,22 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
             B = B.power(-1)
             A_dividedby_B = A.multiply(B)
             F_vec[layer_num] = F_vec[layer_num].multiply(A_dividedby_B.sqrt())
-            print("UPDATING P MATRICES")
 
             #update low-rank inter-layer relation matrices that involve that layer
-            start_one_sided     = glo_one_sided_offset - one_sided_offset
-            end_one_sided       = glo_one_sided_offset
-            print("START ONE SIDED")
-            print(start_one_sided)
-            print("END ONE SIDED")
-            print(end_one_sided)
-            for k in range(len(one_sided_inter)):
-                if(layer_num > one_sided_inter[k]):
-                    pass
-                else:
-                    if(start_one_sided < end_one_sided):
-                        print("layer num")
-                        print(layer_num)
-                        print("curr")
-                        curr            = start_one_sided
-                        print(curr)
-                        print("one_sided_inter[k]")
-                        print(one_sided_inter[k])
-                        P_vec[curr]     = updateP(F_vec[layer_num], D_vec[curr],F_vec[one_sided_inter[k]], P_vec[curr], weight_vec[curr])
-                        start_one_sided = start_one_sided + 1
-            start_signed        = glo_signed_offset - signed_offset
-            end_signed          = glo_signed_offset 
-            for l in range(len(signed_inter)):
-                if (layer_num > signed_inter[l]):
-                    print("WE PASSED")
-                    pass
-                else:
-                    if(start_signed < end_signed):
-                        print("layer num")
-                        print(layer_num)
-                        print("curr")
-                        curr            = start_signed
-                        print(curr)
-                        print("signed_inter[l]")
-                        print(signed_inter[l])
-                        P_pos_vec[curr] = updateP(F_vec[layer_num], D_pos_vec[curr],F_vec[signed_inter[l]], P_pos_vec[curr], weight_sign_vec[curr])
-                        P_neg_vec[curr] = updateP(F_vec[layer_num], D_neg_vec[curr],F_vec[signed_inter[l]], P_neg_vec[curr], weight_sign_vec[curr])
-                        start_signed    = start_signed + 1
-            print("Done with the updates")
-            
-            one_sided_offset   = 0
-            signed_offset      = 0
-            l_one_sided_offset = 0
-            l_signed_offset    = 0
+#            for k in range(len(one_sided_inter)):
+#                if (layer_num > signed_inter[j]):
+#                    pass
+#                else:
+#                    #urr            = k + one_sided_offset
+#                    #_vec[curr]     = updateP(F_vec[layer_num], D_vec[curr],F_vec[one_sided_inter[k]], P_vec[curr], weight_vec[curr])
+#            for l in range(len(signed_inter)):
+#                if (layer_num > signed_inter[j]):
+#                    pass
+#                else:
+#                    #urr            = l + signed_offset
+#                   #P_pos_vec[curr] = updateP(F_vec[layer_num], D_pos_vec[curr],F_vec[signed_inter[l]], P_pos_vec[curr], weight_sign_vec[curr])
+#                   #P_neg_vec[curr] = updateP(F_vec[layer_num], D_neg_vec[curr],F_vec[signed_inter[l]], P_neg_vec[curr], weight_sign_vec[curr])
+#            print("Done with the updates")
 
     
 
