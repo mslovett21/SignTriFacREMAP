@@ -8,13 +8,12 @@ from functools import partial
 import ctypes as c
 
 
-def matrix_multi(A,B,i,cols_p):
+def matrix_multi(A,B,last_used,cols_per_proc):
     
-    print("I'm process", getpid())
     arr      = np.frombuffer(C_test.get_obj())
-    arr      = arr.reshape(ans_rows.value, ans_cols.value) 
+    arr      = arr.reshape(ans_rows.value, ans_cols.value)
     res      = np.dot(A,np.transpose(B))
-    arr[:,i] = res
+    arr[:,last_used:(last_used+cols_per_proc)] = res
 
     return 0
 
@@ -41,27 +40,29 @@ if __name__ == '__main__':
     C_test  = mp.Array(c.c_double,A.shape[0]*B.shape[1])
     
     if (cpu_num > num_cols):
-        cpu_used = num_cols
+        cpu_used  = num_cols
     else:
-        cpu_used = cpu_num
+        cpu_used  = cpu_num
 
-
-    cols_p        = int(num_cols / cpu_used)
+    cols_per_proc = int(num_cols / cpu_used)
     last_used     = 0
     # number of columns of matrix B per process
 
-    if(num_cols == (cols_p *cpu_used)):
-        print("ALL GOOD")
-    else:
-        print("PROBLEM TO SOLVE SOON")
-
     for i in range(cpu_used):
-        print(i)
-        p = mp.Process(target = matrix_multi, args = (A,BT[i],i,cols_p))
+        p = mp.Process(target = matrix_multi, args = (A,BT[last_used:(last_used+cols_per_proc)],last_used,cols_per_proc))
+        p.start()
+        last_used = last_used+cols_per_proc
+        p.join()
+
+    if(num_cols == (cols_per_proc*cpu_used)):
+        pass
+    else:
+        difference = num_cols - last_used
+        p = mp.Process(target = matrix_multi, args = (A,BT[last_used:(last_used+difference)],last_used, difference))
         p.start()
         p.join()
-    print("END OF STORY")
-    print(C_test)
+
+    print("RESULT")
     C_test_b = np.frombuffer(C_test.get_obj())
     C_test   = C_test_b.reshape((ans_rows.value, ans_cols.value))
     print(C_test)
