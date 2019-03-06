@@ -6,7 +6,7 @@ from multiprocessing import Pool
 from os import getpid
 from functools import partial
 import ctypes as c
-
+import sys
 
 def matrix_multi(A,B,last_used,cols_per_proc):
     
@@ -20,15 +20,18 @@ def matrix_multi(A,B,last_used,cols_per_proc):
 
 
 if __name__ == '__main__':
+
+    #get the absolute path to the script
+    script_dir = os.path.abspath(__file__) #<-- absolute dir the script is in
+    script_dir = os.path.split(script_dir)[0] #i.e. /path/to/dir/
     
-    A  = np.array([[1,-2,3],[0,2,1],[3,-4,0],[4,-2,1],[-3,0,2]])
-    B  = np.array([[2,1,-3,1,0,1],[-4,2,0,-1,2,0], [2,-1,2,0,-1,0]])
+    abs_file_pathA = script_dir + str(sys.argv[1])
+    abs_file_pathB = script_dir + str(sys.argv[2])
+    A = np.loadtxt(open(abs_file_pathA, "rb"), delimiter = ",")
+    B = np.loadtxt(open(abs_file_pathB, "rb"), delimiter = ",")
+    
     BT = np.transpose(B)
     
-    C = np.dot(A,B)
-    print("C")
-    print(C)
-
     cpu_num      = mp.cpu_count()
     cpu_used     = 0
     num_cols     = BT.shape[0]
@@ -46,7 +49,13 @@ if __name__ == '__main__':
 
     cols_per_proc = int(num_cols / cpu_used)
     last_used     = 0
+    
     # number of columns of matrix B per process
+    print("DATA ABOUT THE PROCEDURE:")
+    print("Number of columns in B: %d" % (num_cols))
+    print("Number of CPU used: %d" %(cpu_used))
+    print("Number of columns per CPU: %d" % (cols_per_proc))
+
 
     for i in range(cpu_used):
         p = mp.Process(target = matrix_multi, args = (A,BT[last_used:(last_used+cols_per_proc)],last_used,cols_per_proc))
@@ -57,13 +66,19 @@ if __name__ == '__main__':
     if(num_cols == (cols_per_proc*cpu_used)):
         pass
     else:
+        print("Running additional process with a reminder...")
         difference = num_cols - last_used
         p = mp.Process(target = matrix_multi, args = (A,BT[last_used:(last_used+difference)],last_used, difference))
         p.start()
         p.join()
 
     print("RESULT")
+    
     C_test_b = np.frombuffer(C_test.get_obj())
     C_test   = C_test_b.reshape((ans_rows.value, ans_cols.value))
-    print(C_test)
-
+    np.savetxt("mpAB.csv", C_test, delimiter = ",")
+    
+    if (C[2][34] == C_test[2][34]):
+        print("ALL SAME")
+    else:
+        print("DIFFERENT")
