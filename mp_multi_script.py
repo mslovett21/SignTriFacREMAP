@@ -7,6 +7,9 @@ from os import getpid
 from functools import partial
 import ctypes as c
 import sys
+from scipy import sparse
+import csv
+
 
 def matrix_multi(A,B,last_used,cols_per_proc):
     
@@ -21,17 +24,29 @@ def matrix_multi(A,B,last_used,cols_per_proc):
 
 if __name__ == '__main__':
 
+    
     #get the absolute path to the script
     script_dir = os.path.abspath(__file__) #<-- absolute dir the script is in
     script_dir = os.path.split(script_dir)[0] #i.e. /path/to/dir/
     
-    abs_file_pathA = script_dir + str(sys.argv[1])
-    abs_file_pathB = script_dir + str(sys.argv[2])
-    A = np.loadtxt(open(abs_file_pathA, "rb"), delimiter = ",")
-    B = np.loadtxt(open(abs_file_pathB, "rb"), delimiter = ",")
+    abs_file_pathA = script_dir +"/"+ str(sys.argv[1])
+    print("abs path A")
+    print(abs_file_pathA)
+    abs_file_pathB = script_dir + "/"+ str(sys.argv[2])
+    print("abs path B")
+    print(abs_file_pathB)
+    A = np.loadtxt(open(abs_file_pathA, "rb"),delimiter = ",")
+    A = sparse.csr_matrix(A)
+    print("Read in A")
+    B = np.loadtxt(open(abs_file_pathB,"rb"),delimiter = ",")
+    print("Read in B")
+    B = sparse.csr_matrix(B)
     
+    start = time.time()
     BT = np.transpose(B)
     
+    A = A.todense()
+    BT = BT.todense()
     cpu_num      = mp.cpu_count()
     cpu_used     = 0
     num_cols     = BT.shape[0]
@@ -46,7 +61,7 @@ if __name__ == '__main__':
         cpu_used  = num_cols
     else:
         cpu_used  = cpu_num
-
+    cpu_used = 10
     cols_per_proc = int(num_cols / cpu_used)
     last_used     = 0
     
@@ -68,17 +83,15 @@ if __name__ == '__main__':
     else:
         print("Running additional process with a reminder...")
         difference = num_cols - last_used
+        print("reminder %d" %(difference))
         p = mp.Process(target = matrix_multi, args = (A,BT[last_used:(last_used+difference)],last_used, difference))
         p.start()
         p.join()
-
-    print("RESULT")
     
     C_test_b = np.frombuffer(C_test.get_obj())
     C_test   = C_test_b.reshape((ans_rows.value, ans_cols.value))
     np.savetxt("mpAB.csv", C_test, delimiter = ",")
     
-    if (C[2][34] == C_test[2][34]):
-        print("ALL SAME")
-    else:
-        print("DIFFERENT")
+    end = time.time()
+    print("Time used")
+    print(end - start)
