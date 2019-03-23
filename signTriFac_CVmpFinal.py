@@ -27,6 +27,63 @@ import scipy as sp
 from sklearn import metrics
 import time
 from scipy.sparse import rand
+import multiprocessing as mp
+from multiprocessing import Pool
+from functools import partial
+import ctypes as c
+
+
+def matrix_multi(A,B,last_used,cols_per_proc,C_test,ans_rows, ans_cols):
+    arr      = np.frombuffer(C_test.get_obj())
+    arr      = arr.reshape(ans_rows.value, ans_cols.value)
+    res      = np.dot(A,np.transpose(B))
+    arr[:,last_used:(last_used+cols_per_proc)] = res
+    return 0
+
+def mp_multiplication(A,B):
+    start = time.time()
+    BT = np.transpose(B)
+    A  = A.todense()
+    BT = BT.todense()
+    cpu_num      = mp.cpu_count()
+    cpu_used     = 0
+    num_cols     = BT.shape[0]
+    # int values shared amongst all of the processes
+    ans_rows     = mp.Value('i', A.shape[0])
+    ans_cols     = mp.Value('i', B.shape[1])
+    # 2d shared array that stores calculations of all of the procsses
+    C_test  = mp.Array(c.c_double,A.shape[0]*B.shape[1])
+
+    if (cpu_num > num_cols):
+        cpu_used  = num_cols
+    else:
+        cpu_used  = cpu_num
+    cpu_used = 10
+    cols_per_proc = int(num_cols / cpu_used)
+    last_used     = 0
+
+    for i in range(cpu_used):
+        p = mp.Process(target = matrix_multi, args = (A,BT[last_used:(last_used+cols_per_proc)],last_used,cols_per_proc,C_test,ans_rows,ans_cols))
+        p.start()
+        last_used = last_used+cols_per_proc
+        p.join()
+    
+    if(num_cols == (cols_per_proc*cpu_used)):
+        pass
+    else:
+        difference = num_cols - last_used
+        p = mp.Process(target = matrix_multi, args = (A,BT[last_used:(last_used+difference)],last_used, difference,C_test,ans_rows,ans_cols))
+        p.start()
+        p.join()
+
+    C_test_b = np.frombuffer(C_test.get_obj())
+    C_test   = C_test_b.reshape((ans_rows.value, ans_cols.value))
+    C        = sparse.csr_matrix(C_test)
+    end = time.time()
+    print("Time spend in mp product")
+    print(end-start)
+    return C          
+
 
 def D_estimation(D_est, D):
     print("FUNCTION: D_estimate")
@@ -83,25 +140,14 @@ def signLowF(D_pos,D_neg,F_j,P_pos,P_neg,FjtP_pos, FjtP_neg, bal,F_i,weight):
     start1        = time.time()
     start2        = time.time()
     w_sq          = pow(weight,2)
-    print("calculating tFj....")
     tFj           = F_j.transpose()
-    print("calculating P_postFj....")
-    print("Shape of P_pos")
-    print(P_pos.shape)
-    print("Shape of tFj")
-    print(tFj.shape)
     P_postFj      = P_pos.dot(tFj)
-    print("calculating P_negtFj....")
     P_negtFj      = P_neg.dot(tFj)
-    print("calculating FiP_postFj...")
     FiP_postFj    = F_i.dot(P_postFj)
-    print("calculating D_pos_tilde")
     row,col,datap = D_estimation(FiP_postFj,D_pos)
     D_pos_tilde   = sparse.csr_matrix((datap,(row,col)),shape = D_pos.shape)
-    print("calculating FiP_negFj")
     FiP_negtFj    = F_i.dot(P_negtFj)
     row,col,datan = D_estimation(FiP_negtFj,D_neg)
-    print("calculating D_neg_tilde")
     D_neg_tilde   = sparse.csr_matrix((datan,(row,col)),shape = D_neg.shape)
     DFjtP_pos     = D_pos_tilde.dot(FjtP_pos)
     DFjtP_neg     = D_neg_tilde.dot(FjtP_neg)
@@ -200,12 +246,8 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
     end = time.time()
     print("Time taken to initialize all of the needed matrices:")
     print(end- start)
-    for i in range(len(P_pos_vec)):
-        print("P_pos_vec")
-        print(P_pos_vec[i].shape)
-    for i in range(len(P_vec)):
-        print("P_vec")
-        print(P_vec[i].shape)
+
+
     curr_iter           = 0
     start               = time.time()
     G_size              = G_matrix.shape[0]
@@ -241,10 +283,6 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
 
             one_sided_inter = np.where(G_matrix[layer_num] == 1)[0]
             signed_inter    = np.where(G_matrix[layer_num] == 2)[0]
-            print("one_sided_inter")
-            print(one_sided_inter)
-            print("signed_inter")
-            print(signed_inter)
 
             for i in range(len(one_sided_inter)):
                 print("CALCULATION: oneSidedUppF")
@@ -300,12 +338,6 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
                     D_neg     = D_neg.transpose()
                     P_pos     = P_pos.transpose()
                     P_neg     = P_neg.transpose()
-                print("Shapes P_pos")
-                print(P_pos.shape)
-                print("Shape Fj")
-                print(F_vec[signed_inter[j]].shape)
-                print("Shape D")
-                print(D_pos.shape)
 
                 FjtP_pos  = F_vec[signed_inter[j]].dot(tP_pos)
                 FjtP_neg  = F_vec[signed_inter[j]].dot(tP_neg)
@@ -321,44 +353,29 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
             B = B.power(-1)
             A_dividedby_B = A.multiply(B)
             F_vec[layer_num] = F_vec[layer_num].multiply(A_dividedby_B.sqrt())
-            print("UPDATING P MATRICES")
+    
 
             #update low-rank inter-layer relation matrices that involve that layer
             start_one_sided     = glo_one_sided_offset - one_sided_offset
             end_one_sided       = glo_one_sided_offset
-            print("START ONE SIDED")
-            print(start_one_sided)
-            print("END ONE SIDED")
-            print(end_one_sided)
+
             for k in range(len(one_sided_inter)):
                 if(layer_num > one_sided_inter[k]):
                     pass
                 else:
                     if(start_one_sided < end_one_sided):
-                        print("layer num")
-                        print(layer_num)
-                        print("curr")
                         curr            = start_one_sided
-                        print(curr)
-                        print("one_sided_inter[k]")
-                        print(one_sided_inter[k])
                         P_vec[curr]     = updateP(F_vec[layer_num], D_vec[curr],F_vec[one_sided_inter[k]], P_vec[curr], weight_vec[curr])
                         start_one_sided = start_one_sided + 1
             start_signed        = glo_signed_offset - signed_offset
             end_signed          = glo_signed_offset 
             for l in range(len(signed_inter)):
                 if (layer_num > signed_inter[l]):
-                    print("WE PASSED")
                     pass
                 else:
                     if(start_signed < end_signed):
-                        print("layer num")
                         print(layer_num)
-                        print("curr")
                         curr            = start_signed
-                        print(curr)
-                        print("signed_inter[l]")
-                        print(signed_inter[l])
                         P_pos_vec[curr] = updateP(F_vec[layer_num], D_pos_vec[curr],F_vec[signed_inter[l]], P_pos_vec[curr], weight_sign_vec[curr])
                         P_neg_vec[curr] = updateP(F_vec[layer_num], D_neg_vec[curr],F_vec[signed_inter[l]], P_neg_vec[curr], weight_sign_vec[curr])
                         start_signed    = start_signed + 1
@@ -512,7 +529,27 @@ if __name__== '__main__':
             A_vec.append(sparse.csr_matrix(A))
         end = time.time()
         print("Time to read in the data and change it to sparse matrices")
+        print("Experiment - checking if mp_multiplication works")
+        print("Shape check:")
+        print("D_pos_vec[0]")
+        print(D_pos_vec[0].shape)
+        print("A_vec[1]")
+        print(A_vec[1].shape)
+        A1= D_pos_vec[0]
+        B1= A_vec[1]
+        C_mp  = mp_multiplication(A1,B1)
+        print("Dot product")
+        C_dot =A1.dot(B1)
         print(end-start)
+        print("Check if equal")
+        A_nnz = A1.nnz
+        B_nnz = B1.nnz
+        print("A nnzs")
+        print(A_nnz)
+        print("B nnzs")
+        print(B_nnz)
+        print("Check if nnz are equal")
+        print(A_nnz == B_nnz)
         [F_vec,P_vec, P_pos_vec, P_neg_vec] = signTriFacREMAP_CV(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, weight_sign_vec, b_vec, max_iter)
 
 
