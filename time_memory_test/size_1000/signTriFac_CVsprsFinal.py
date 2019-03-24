@@ -121,6 +121,8 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
     num_layers  = len(A_vec)    
     #initialize a vector that stores number of elems in each of the layers
     layers_size = [0] * num_layers
+    print(len(D_vec))
+    print(D_vec[0].shape)
     
     for i in range(num_layers):
         layers_size[i] = A_vec[i].shape[0]
@@ -189,6 +191,8 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
         signed_inter          = []
 
         for layer_num in range(num_layers):
+            print("Layer")
+            print(layer_num)
 
             #initialize matrix of shape of a layer that is currently being updated
             upper_sum       = rand(F_vec[layer_num].shape[0], F_vec[layer_num].shape[1], density=0.1, format = "csr")
@@ -248,12 +252,15 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
                 FjtP_pos  = F_vec[signed_inter[j]].dot(tP_pos)
                 FjtP_neg  = F_vec[signed_inter[j]].dot(tP_neg)
 
+                print("Done until here:")
                 upper_sum = sparse.csr_matrix(upper_sum) + sigUppF(D_pos,D_neg,FjtP_pos,FjtP_neg, bal_vec[curr])
-
+                print("Done with upper sum")
                 lower_sum = sparse.csr_matrix(lower_sum) + signLowF(D_pos,D_neg,F_vec[signed_inter[j]],P_pos,P_neg,FjtP_pos,FjtP_neg, bal_vec[curr],F_vec[layer_num],weight_sign_vec[curr])
             A = upper_sum + (alpha * A_vec[layer_num].dot(F_vec[layer_num]))
+            print("Done with A")
             B = lower_sum + (alpha * T_vec[layer_num].dot(F_vec[layer_num]) + (beta * F_vec[layer_num]))
             B = B.power(-1)
+            print("Done with B")
             A_dividedby_B = A.multiply(B)
             F_vec[layer_num] = F_vec[layer_num].multiply(A_dividedby_B.sqrt())
 
@@ -351,7 +358,7 @@ def signTriFacREMAP_CV(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec,
                                 pred_val_file.write(str(predicted_values[v]))
                                 pred_val_file.write("\n")
                             pred_val_file.close()
-                            D_vec[:] = []
+                            D_vec = []
 
 
 
