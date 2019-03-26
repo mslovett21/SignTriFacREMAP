@@ -121,8 +121,6 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
     num_layers  = len(A_vec)    
     #initialize a vector that stores number of elems in each of the layers
     layers_size = [0] * num_layers
-    print(len(D_vec))
-    print(D_vec[0].shape)
     
     for i in range(num_layers):
         layers_size[i] = A_vec[i].shape[0]
@@ -171,7 +169,6 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
 
 
     while( curr_iter < max_iter):
-        print("Current iteration %d" % (curr_iter))
         start  = time.time()
         
         one_sided_offset      = 0
@@ -191,8 +188,6 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
         signed_inter          = []
 
         for layer_num in range(num_layers):
-            print("Layer")
-            print(layer_num)
 
             #initialize matrix of shape of a layer that is currently being updated
             upper_sum       = rand(F_vec[layer_num].shape[0], F_vec[layer_num].shape[1], density=0.1, format = "csr")
@@ -201,8 +196,7 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
             one_sided_inter = np.where(G_matrix[layer_num] == 1)[0]
             signed_inter    = np.where(G_matrix[layer_num] == 2)[0]
 
-            for i in range(len(one_sided_inter)):
-                
+            for i in range(len(one_sided_inter)):                
                 curr      = 0
                 if (layer_num > one_sided_inter[i]):
                     curr                   =  glo_lone_sided_offset
@@ -223,7 +217,6 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
                 lower_sum = lower_sum + oneSidedLowF( F_vec[one_sided_inter[i]], P,F_vec[layer_num],FjtP, weight_vec[curr], D)
             
             for j in range(len(signed_inter)):
-
                 curr      = 0
 
                 if(layer_num > signed_inter[j]):
@@ -248,19 +241,14 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
                     D_neg     = D_neg.transpose()
                     P_pos     = P_pos.transpose()
                     P_neg     = P_neg.transpose()
-
                 FjtP_pos  = F_vec[signed_inter[j]].dot(tP_pos)
                 FjtP_neg  = F_vec[signed_inter[j]].dot(tP_neg)
 
-                print("Done until here:")
                 upper_sum = sparse.csr_matrix(upper_sum) + sigUppF(D_pos,D_neg,FjtP_pos,FjtP_neg, bal_vec[curr])
-                print("Done with upper sum")
                 lower_sum = sparse.csr_matrix(lower_sum) + signLowF(D_pos,D_neg,F_vec[signed_inter[j]],P_pos,P_neg,FjtP_pos,FjtP_neg, bal_vec[curr],F_vec[layer_num],weight_sign_vec[curr])
             A = upper_sum + (alpha * A_vec[layer_num].dot(F_vec[layer_num]))
-            print("Done with A")
             B = lower_sum + (alpha * T_vec[layer_num].dot(F_vec[layer_num]) + (beta * F_vec[layer_num]))
             B = B.power(-1)
-            print("Done with B")
             A_dividedby_B = A.multiply(B)
             F_vec[layer_num] = F_vec[layer_num].multiply(A_dividedby_B.sqrt())
 
@@ -292,13 +280,13 @@ def signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, we
             signed_offset      = 0
             l_one_sided_offset = 0
             l_signed_offset    = 0
-
-    
+  
 
         curr_iter        = curr_iter + 1
         end = time.time()
         print("Time to complete the interations:")
         print(end - start)
+    
 
     return (F_vec,P_vec, P_pos_vec, P_neg_vec)
 
@@ -309,8 +297,8 @@ def signTriFacREMAP_CV(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec,
 
     print("Start the 10 fold CV for:weight_vec, weight_sign_vec, alpha, beta, bal_vec")
 
-    check = open("data/check.txt", "w+")
-
+    start_fold    = time.time()
+    end_fold      = time.time()
     alpha_vec     = []
     beta_vec      = []
     P_vec         = []
@@ -322,7 +310,8 @@ def signTriFacREMAP_CV(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec,
     alphas_range  = np.arange(0.1,1.1,0.2)
     betas_range   = np.arange(0.1,1.1,0.2)  
     weights_range = np.arange(0.1,1.1,0.2)
-    
+    G_original = np.copy(G_matrix)
+    file_time = open("size_100_iter50_time.txt", "a+")
 
     for i in range(len(alphas_range)):
         alpha = alphas_range[i]
@@ -338,8 +327,10 @@ def signTriFacREMAP_CV(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec,
                         # here we are opening 10 different files containing different matrices together with their associated indexes files.
                         # indexes should be stored in the list of lists
                         for k in range(1,11):
+                            start_fold= time.time()
                             D_vec.append(sparse.load_npz("data/ten_fold/matrix_fold_" + str(k) + ".npz"))
                             print("FOLD: %d" % ( k))
+                            G_matrix =np.copy(G_original)
                             F_vec,P_vec, P_pos_vec, P_neg_vec = signTriFacREMAP(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, weight_sign_vec, b_vec, max_iter,alpha,beta)
                             predicted_matrix                  = np.dot(np.dot(F_vec[0],P_vec[0]), F_vec[2].transpose())
                             masked_indexes = []
@@ -359,6 +350,11 @@ def signTriFacREMAP_CV(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec,
                                 pred_val_file.write("\n")
                             pred_val_file.close()
                             D_vec = []
+                            end_fold = time.time()
+                            file_time.write("Time spend on fold "+ str(k) + ": " + str(end_fold-start_fold))
+                            file_time.write("\n")
+                            file_time.flush()
+
 
 
 
@@ -432,9 +428,8 @@ if __name__== '__main__':
             abs_file_path = script_dir + str(A_matrix[k][k])
             A = sparse.load_npz(abs_file_path)
             A_vec.append(A)
-        end = time.time()
-        print("Time to read in the data and change it to sparse matrices")
-        print(end-start)
         [F_vec,P_vec, P_pos_vec, P_neg_vec] = signTriFacREMAP_CV(G_matrix, A_vec, D_vec, D_pos_vec, D_neg_vec, weight_vec, weight_sign_vec, b_vec, max_iter)
+        end = time.time()
+        print(end - start)
 
 
