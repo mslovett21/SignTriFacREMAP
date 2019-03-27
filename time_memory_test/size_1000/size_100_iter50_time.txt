@@ -1,5 +1,3 @@
-Time spend on fold 1: 191.925311088562
-Time spend on fold 2: 191.2963352203369
 Time spend on fold 1: 2994.3062341213226
 Time spend on fold 2: 2980.283483505249
 Time spend on fold 3: 2975.3534166812897
